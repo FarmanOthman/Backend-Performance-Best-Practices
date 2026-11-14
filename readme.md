@@ -6,7 +6,7 @@ Source: roadmap.sh/backend-performance-best-practices
 
 ---
 
-# 1. Caching Strategy
+## 1. Caching Strategy
 
 ### Caching Mechanisms
 
@@ -25,6 +25,7 @@ Choose deliberately, not by default:
 * **Cache-aside** — check cache → miss → fetch from source → populate cache
 * **Write-through** — write to cache and source together
 * **Read-through** — cache layer loads missing data itself
+* **Write-behind (write-back)** — write to cache immediately, persist to source asynchronously. Faster writes, but risks data loss on cache failure before the write lands — only use when that tradeoff is acceptable
 
 ---
 
@@ -36,17 +37,22 @@ Choose deliberately, not by default:
   * TTL expiry
   * Explicit purge-on-write
   * Versioned cache keys
+* Guard against **cache stampede** (thundering herd) — when a hot key expires, don't let every concurrent request miss the cache and hit the source simultaneously. Use one of:
+
+  * Request coalescing / locking (only one request repopulates, others wait)
+  * Early/probabilistic refresh before TTL expiry
+  * Stale-while-revalidate (serve stale data while refreshing in the background)
 
 ---
 
-# 2. Database Performance
+## 2. Database Performance
 
 ### Connection Management
 
 * **Use connection pooling.** Never open/close a raw connection per request.
 * Tune pool settings explicitly:
 
-```
+```text
 max connections
 idle timeout
 connection reuse params
@@ -85,7 +91,7 @@ Fetch only the columns the code actually uses.
 * Minimize and optimize JOINs — remove any that aren't necessary.
 * Run regular maintenance:
 
-```
+```text
 Vacuum
 Re-index
 Clean up unused/stale data
@@ -103,7 +109,7 @@ Clean up unused/stale data
 
 ---
 
-# 3. Network Optimization
+## 3. Network Optimization
 
 ### Latency Reduction
 
@@ -124,13 +130,13 @@ Clean up unused/stale data
 
 ---
 
-# 4. API Response Optimization
+## 4. API Response Optimization
 
 ### Payload Control
 
 * Enforce payload size limits on requests and responses.
 
-```
+```text
 Example:
 JSON body: 1MB
 File upload: configurable, explicit max
@@ -138,6 +144,7 @@ File upload: configurable, explicit max
 
 * Enable compression (`gzip`/`brotli`) on responses.
 * Paginate large datasets in API responses.
+* Support sparse fieldsets — let clients request only the fields they need (`?fields=id,name`) instead of always returning the full object.
 
 ---
 
@@ -148,14 +155,14 @@ File upload: configurable, explicit max
 
 ---
 
-# 5. Asynchronous Processing
+## 5. Asynchronous Processing
 
 ### Background Jobs
 
 * Offload heavy or slow tasks to background jobs/queues.
 * Never block the request/response cycle on:
 
-```
+```text
 Email sending
 Image/video processing
 Report generation
@@ -170,7 +177,7 @@ Bulk exports
 
 ---
 
-# 6. Load Balancing & Scaling
+## 6. Load Balancing & Scaling
 
 ### Scaling Strategy
 
@@ -187,7 +194,7 @@ Bulk exports
 
 ---
 
-# 7. Code-Level Optimization
+## 7. Code-Level Optimization
 
 ### Profiling
 
@@ -223,6 +230,10 @@ Bulk exports
 
 * Set explicit connection timeouts.
 * Implement efficient retry logic for network calls (backoff, max attempts).
+* Use a **circuit breaker** around calls to unreliable or overloaded dependencies — stop sending requests to a failing dependency for a cooldown period instead of retrying into it and compounding load.
+
+  * States: closed (normal) → open (fail fast, no calls) → half-open (test with limited traffic) → closed or open again
+* Design retries to be idempotent — a retried write must not duplicate the effect of the original.
 
 ---
 
@@ -232,7 +243,7 @@ Bulk exports
 
 ---
 
-# 8. Security Practices Affecting Performance
+## 8. Security Practices Affecting Performance
 
 ### Dependency Hygiene
 
@@ -250,7 +261,7 @@ Bulk exports
 
 * Apply request throttling and rate limiting to protect backend resources from abuse/overload.
 
-```
+```text
 Example:
 100 requests/min per user
 1000 requests/min per IP
@@ -264,14 +275,14 @@ Example:
 
 ---
 
-# 9. Monitoring and Logging
+## 9. Monitoring and Logging
 
 ### Observability Stack
 
 * Instrument comprehensive monitoring and logging for performance metrics and troubleshooting — don't ship blind.
 * Use standard tooling rather than ad hoc solutions:
 
-```
+```text
 Metrics: Prometheus
 Dashboards: Grafana
 Logs: ELK stack
@@ -285,14 +296,14 @@ Logs: ELK stack
 
 ---
 
-# 10. Performance Testing
+## 10. Performance Testing
 
 ### Benchmarking Cadence
 
 * Run performance testing and benchmarking regularly, not just once at launch.
 * Use it to:
 
-```
+```text
 Catch performance regressions
 Track improvements over time
 Validate optimization efforts
@@ -300,14 +311,14 @@ Validate optimization efforts
 
 ---
 
-# Result
+## Result
 
 This checklist covers the full performance surface of a backend system:
 
-| Layer                 | Covered |
-| ---------------------- | ------- |
+| Layer | Covered |
+| --- | --- |
 | Data layer (caching/DB) | ✔ |
-| Network layer           | ✔ |
-| Application layer       | ✔ |
-| Scaling & resilience    | ✔ |
+| Network layer | ✔ |
+| Application layer | ✔ |
+| Scaling & resilience | ✔ |
 | Operational (monitoring/testing) | ✔ |
